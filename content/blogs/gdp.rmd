@@ -1,0 +1,435 @@
+---
+categories:
+- ""
+- ""
+date: "2017-10-31T21:28:43-05:00"
+description: "Gapminder Revisited + GDP components over time and among countries"
+draft: false
+image: gdp.jpg
+keywords: ""
+slug: gdp
+title: Gapminder Revisited + GDP Evolution over time!
+---
+# Gapminder Revisited
+```{r, setup, echo=FALSE}
+knitr::opts_chunk$set(
+  message = FALSE, 
+  warning = FALSE, 
+  tidy=FALSE,     # display code as typed
+  size="small")   # slightly smaller font for code
+options(digits = 3)
+# default figure size
+knitr::opts_chunk$set(
+  fig.width=6.75, 
+  fig.height=6.75,
+  fig.align = "center"
+)
+```
+
+```{r load-libraries, echo=FALSE}
+library(tidyverse)  # Load ggplot2, dplyr, and all the other tidyverse packages
+library(mosaic)
+library(ggthemes)
+library(GGally)
+library(readxl)
+library(here)
+library(skimr)
+library(janitor)
+library(broom)
+library(tidyquant)
+library(infer)
+library(openintro)
+```
+
+
+Gapminder data frame contains just 6 columns from the larger data in Gapminder World. In this part, we shall join a few dataframes with more data than the ‘gapminder’ package. Specifically, let's look at data on
+
+* Life expectancy at birth (life_expectancy_years.csv)
+* GDP per capita in constant 2010 US$ (https://data.worldbank.org/indicator/NY.GDP.PCAP.KD)
+* Female fertility: The number of babies per woman (https://data.worldbank.org/indicator/SP.DYN.TFRT.IN)
+* Primary school enrollment as % of children attending primary school (https://data.worldbank.org/indicator/SE.PRM.NENR)
+* Mortality rate, for under 5, per 1000 live births (https://data.worldbank.org/indicator/SH.DYN.MORT)
+* HIV prevalence (adults_with_hiv_percent_age_15_49.csv): The estimated number of people living with HIV per 100 population of age group 15-49.
+
+```{r}
+library(gapminder)
+skim(gapminder)
+```
+
+```{r}
+# load gapminder HIV data
+hiv <- read_csv(here::here("data","adults_with_hiv_percent_age_15_49.csv"))
+life_expectancy <- read_csv(here::here("data","life_expectancy_years.csv"))
+
+# get World bank data using wbstats
+indicators <- c("SP.DYN.TFRT.IN","SE.PRM.NENR", "SH.DYN.MORT", "NY.GDP.PCAP.KD")
+
+
+library(wbstats)
+
+worldbank_data <- wb_data(country="countries_only", #countries only- no aggregates like Latin America, Europe, etc.
+                          indicator = indicators, 
+                          start_date = 1960, 
+                          end_date = 2016)
+
+# get a dataframe of information regarding countries, indicators, sources, regions, indicator topics, lending types, income levels,  from the World Bank API 
+countries <-  wbstats::wb_cachelist$countries
+
+```
+
+Left Join makes the most sense among the different types of join operations like outer joins - left, right, and full. This is because a left join operation (regardless of there being a match) preserves the original observations, especially when one looks up additional data from another table. Since, we are working with 3 dataframes, while mapping the year and date column with different start/end time frames, it is essential to preserve the original observations in each dataframe.
+
+```{r}
+# tidying HIV data - hiv and life_expectancy dataframes - using pivot_longer() + remving NA values
+hiv1 <- hiv %>%
+  pivot_longer(2:34, names_to = "year", values_to = "Percentage_HIV_Cases_Age_15_49") %>% 
+  drop_na()
+skim(hiv1)
+```
+
+```{r}
+life_expectancy_1 <- life_expectancy %>%
+  pivot_longer(2:302, names_to = "year", values_to = "Life_Expectancy") %>% 
+  drop_na()
+skim(life_expectancy_1)
+```
+
+
+
+```{r}
+#Removing NA values in worldbank_data
+worldbank_data_1 <- worldbank_data %>%
+  drop_na()
+skim(worldbank_data_1)
+```
+
+```{r}
+#Left Join of life_expectancy_1 (tidied life_expectancy) and hiv1 (tidied hiv) dataframes 
+join_1 <- left_join(life_expectancy_1, hiv1, by = c("country"="country", "year"="year"))
+# Converting datatype of column (year) from character type to numeric type
+join_1$year = as.numeric(join_1$year)
+```
+
+```{r}
+#Left Join of join_1 (left join of hiv1 and life_expectancy_1 dataframes) and worldbank_data dataframes
+join_2 <- left_join(join_1, worldbank_data_1, by = c("country"="country", "year"="date"))
+```
+
+```{r}
+#Left Join of join_1 (left join of hiv1 and life_expectancy_1 dataframes) and worldbank_data dataframes
+join_3 <- left_join(join_2, countries, "country"="country") %>%
+  drop_na()
+join_3
+```
+
+What is the relationship between HIV prevalence and life expectancy? 
+
+Based on the scatterplot with a smoothing line, it seems like region plays a role in the relationship between HIV prevalence and life expectancy. HIV Prevalence is depicted through the percentage of HIV cases in the age group 15-49 years. In the case of Sub-Saharan Africa, there is a definite pattern of a negative slope which implies that as HIV prevalence increases, there is a decrease in Life Expectancy. In Latin America too, there is a negative slope implying an inverse relationship between HIV prevalence and Life Expectancy. However, there is more variability in the plot for Sub-Saharan Africa as compared to Latin America.
+
+```{r}
+#Scatterplot for Life Expectancy vs. HIV prevalence 
+ggplot(join_3, aes(x = Percentage_HIV_Cases_Age_15_49, y = Life_Expectancy)) +
+    geom_point(size = 0.3) +
+    geom_smooth(method="lm") +
+    facet_wrap(~ region) +
+    labs(title = "Relationship between HIV Prevalence and Life Expectancy", 
+         x = "HIV Prevalence",
+         y = "Life Expectancy")
+```
+
+What is the relationship between fertility rate and GDP per capita? 
+
+Based on the scatterplot with a smoothing line, it seems like facetting by region solidifies the belief that all regions depict an inverse relationship between fertility rate and GDP per capita. In the case of Sub-Saharan Africa in particular, as the fertility rate increases, the GDP per capita decreases. The inverse relationship between the two variables demonstrates the connection between fertility choices and economic considerations. In general, developing or low-income countries tend to have higher levels of fertility than their developed counterparts for several reasons such as infant mortality, lack of access to contraceptives, generally lower levels of female education, etc.
+
+```{r}
+ggplot(join_3, aes(x = SP.DYN.TFRT.IN, y = NY.GDP.PCAP.KD)) +
+    geom_point(size = 0.5) +
+    geom_smooth(method="lm") +
+    facet_wrap(~ region) +
+    labs(title = "Relationship between Fertility Rate and GDP per capita", 
+         x = "Fertility Rate",
+         y = "GDP per capita")+
+  NULL
+```
+
+Which regions have the most observations with missing HIV data? 
+
+Region ‘Sub-Saharan Africa’ has the most observations with missing HIV data. This is followed by Europe & Central Asia with the 2nd most observations with missing HIV data.
+
+```{r}
+#Tidying hiv dataframe
+tidy_hiv <- hiv %>% 
+  pivot_longer(cols=2:34, names_to="year", values_to = "Percentage_HIV_Cases_Age_15_49")
+#Left joining tidy_hiv and countries dataframes
+joined_hiv_countries <- left_join(tidy_hiv, countries, "country"= "country")
+joined_hiv_countries
+```
+
+```{r}
+# Determining NA values in joined_hiv_countries dataframe
+joined_hiv_countries %>%
+  filter(!is.na(region)) %>%
+  group_by(region) %>%
+  summarise(missing_hiv_values=sum(is.na(Percentage_HIV_Cases_Age_15_49))) %>%
+  mutate(
+    region=fct_reorder(region,-missing_hiv_values)) %>%
+# Plotting Bar Chart of Region Specific Missing HIV Data in Descending Order
+  ggplot(aes(x=missing_hiv_values,y=region))+
+  geom_col(fill = "coral")+
+  labs(title="Bar Chart of Region Specific Missing HIV Data in Descending Order",
+    x= "Missing NA values in HIV data",
+    y= "Region"
+  )
+```
+
+How has mortality rate for under 5 changed by region? 
+In each region, the top 5 countries that have seen the greatest improvement, as well as those 5 countries where mortality rates have had the least improvement or even deterioration, have been determined.
+
+```{r}
+#Minimum Year and Maximum Year determination
+mortality <- join_3 %>% 
+  group_by(country) %>%
+  summarise(minimum_year=min(year), maximum_year=max(year))
+mortality
+```
+
+```{r}
+# Dataframe with original mortality rates
+join_5 <- left_join(join_3, mortality, "country"="country") %>% #Left Joining join_3 and mortality dataframes
+select(country, year, minimum_year, maximum_year, SH.DYN.MORT, region) %>% # Selecting required columns
+mutate(
+  original_mortality = ifelse(year == minimum_year, SH.DYN.MORT, 0)) %>% #Determining original mortality rates
+select(!year) %>%
+filter(!original_mortality == 0)%>%
+select(!SH.DYN.MORT)
+
+join_5
+```
+
+```{r}
+# Dataframe with final mortality rates
+join_6 <- left_join(join_3, mortality, "country"="country") %>% #Left Joining join_3 and mortality dataframes
+select(country, year, minimum_year, maximum_year, SH.DYN.MORT, region) %>% # Selecting required columns
+mutate(
+  final_mortality = ifelse(year == maximum_year, SH.DYN.MORT, 0)) %>%  #Determining final mortality rates
+select(!year) %>%
+filter(!final_mortality == 0)%>%
+select(!SH.DYN.MORT)
+
+join_6
+```
+
+```{r}
+# Joining aforementioned join_5 and join_6 dataframes along with Improvement in Mortality Rates calculation
+join_7 <- left_join(join_5, join_6, "country"="country") %>%  #Left Joining join_5 and join_6
+  mutate(
+    mortality_improvement = (final_mortality - original_mortality)/original_mortality) %>%
+  arrange(desc(mortality_improvement))
+
+join_7
+```
+
+```{r}
+# Determining Change in Mortality Rate for Under 5 in each region
+mortality_improvement_by_region <- join_7 %>%
+  group_by(region) %>%
+  summarise(mean_mortality_improvement_rate = 100 * mean(mortality_improvement))
+
+mortality_improvement_by_region
+```
+
+```{r}
+# Plot for Region-Specific Change in Mortality Rate for Under 5
+ggplot(mortality_improvement_by_region, aes(x = mean_mortality_improvement_rate, y = fct_reorder(region, -mean_mortality_improvement_rate))) +
+  geom_col(fill = "steelblue")+
+  labs(
+    title= "Region-Specific Change in Mortality Rate for Under 5",
+    x= "Change in Mortality Rate for Under 5",
+    y="Region"
+  )
+```
+
+```{r}
+#Sub-Saharan Africa
+join_7 %>% #The Top 5 countries with the greatest improvement in mortality rates
+  filter(region == "Sub-Saharan Africa") %>%
+  slice_max(order_by = mortality_improvement, n = 5)
+```
+
+```{r}
+join_7 %>% #The Top 5 countries with the least improvement in mortality rates
+  filter(region == "Sub-Saharan Africa") %>%
+  slice_max(order_by = -mortality_improvement, n = 5)
+```
+
+```{r}
+#South Asia
+join_7 %>% #The Top 5 countries with the greatest improvement in mortality rates
+  filter(region == "South Asia") %>%
+  slice_max(order_by = mortality_improvement, n = 5)
+```
+
+```{r}
+join_7 %>% #The Top 5 countries with the least improvement in mortality rates
+  filter(region == "South Asia") %>%
+  slice_max(order_by = -mortality_improvement, n = 5)
+```
+
+```{r}
+#Latin America & Caribbean
+join_7 %>% #The Top 5 countries with the greatest improvement in mortality rates
+  filter(region == "Latin America & Caribbean") %>%
+  slice_max(order_by = mortality_improvement, n = 5)
+```
+
+```{r}
+join_7 %>% #The Top 5 countries with the least improvement in mortality rates
+  filter(region == "Latin America & Caribbean") %>%
+  slice_max(order_by = -mortality_improvement, n = 5)
+```
+
+```{r}
+#Europe & Central Asia
+join_7 %>% #The Top 5 countries with the greatest improvement in mortality rates
+  filter(region == "Europe & Central Asia") %>%
+  slice_max(order_by = mortality_improvement, n = 5)
+```
+
+```{r}
+join_7 %>% #The Top 5 countries with the least improvement in mortality rates
+  filter(region == "Europe & Central Asia") %>%
+  slice_max(order_by = -mortality_improvement, n = 5)
+```
+
+```{r}
+#Middle East & North Africa
+join_7 %>% #The Top 5 countries with the greatest improvement in mortality rates
+  filter(region == "Middle East & North Africa") %>%
+  slice_max(order_by = mortality_improvement, n = 5)
+```
+
+```{r}
+join_7 %>% #The Top 5 countries with the least improvement in mortality rates
+  filter(region == "Middle East & North Africa") %>%
+  slice_max(order_by = -mortality_improvement, n = 5)
+```
+
+```{r}
+#East Asia & Pacific
+join_7 %>% #The Top 5 countries with the greatest improvement in mortality rates
+  filter(region == "East Asia & Pacific") %>%
+  slice_max(order_by = mortality_improvement, n = 5)
+```
+
+```{r}
+join_7 %>% #The Top 5 countries with the least improvement in mortality rates
+  filter(region == "East Asia & Pacific") %>%
+  slice_max(order_by = -mortality_improvement, n = 5)
+```
+
+Is there a relationship between primary school enrollment and fertility rate? 
+
+Yes, there seems to be a strong inverse relationship between primary school enrollment and fertility rate. We would desire to see a distribution of values like in Europe&Central Asia, where there is a very high percentage of people completing primary education and the higher this percentage, the lower the mortality rate. We can observe a similar pattern for Latin America & Caribbean. In South Asia, the countries have very diverse percentages of population having completed primary education, as does Sub-Saharan Africa. In the latter and in East Asia&Pacific, we also observe an inverse trend: we seem to find an increased mortality rate for countries with higher percentage of population having completed primary education. 
+
+```{r}
+ggplot(join_3, aes(x = SE.PRM.NENR, y = SP.DYN.TFRT.IN)) +
+    geom_point() +
+    geom_smooth(method="lm") +
+    labs(title = "Relationship between Primary School Enrollment and Fertility Rate", 
+         x = "Primary School Enrollment",
+         y = "Fertility Rate")
+```
+# GDP components over time and among countries!
+
+```{r}
+UN_GDP_data  <-  read_excel(here::here("data", "Download-GDPconstant-USD-countries.xls"), # Excel filename
+                sheet="Download-GDPconstant-USD-countr", # Sheet name
+                skip=2) # Number of rows to skip
+```
+
+```{r}
+# Tidying data - Making data long and expressing all figures in billions
+tidy_GDP_data_1 <- UN_GDP_data %>%
+  pivot_longer(4:51, names_to = "year", values_to = "indicator_data") %>%
+  mutate(indicator_data = indicator_data / 1000000000)
+```
+
+```{r}
+# Renaming indicators into shorter counterparts
+tidy_GDP_data_1 <- tidy_GDP_data_1
+tidy_GDP_data_1$IndicatorName[tidy_GDP_data_1$IndicatorName == "Exports of goods and services"] <-  "Exports"
+tidy_GDP_data_1$IndicatorName[tidy_GDP_data_1$IndicatorName == "General government final consumption expenditure"] <-  "Government expenditure" 
+tidy_GDP_data_1$IndicatorName[tidy_GDP_data_1$IndicatorName == "Household consumption expenditure (including Non-profit institutions serving households)"] <-  "Household expenditure" 
+tidy_GDP_data_1$IndicatorName[tidy_GDP_data_1$IndicatorName == "Imports of goods and services"] <-  "Imports"
+
+glimpse(tidy_GDP_data_1)
+```
+
+```{r}
+# Let us compare GDP components for these 3 countries
+country_list <- c("United States","India", "Germany")
+```
+
+```{r}
+# Required Indicators names for graph
+list_indicator_name = c("Gross capital formation","Exports", "Government expenditure", "Household expenditure", "Imports")
+tidy_GDP_data_1 %>%
+  filter(Country%in% country_list) %>% #Filtering by aforementioned country_list
+  filter(IndicatorName %in% list_indicator_name ) %>% #Filtering by list_indicator_name
+  group_by(IndicatorName) %>%  
+  # Line plot for GDP over time graph
+  ggplot(aes(x = year, y = indicator_data, color = IndicatorName, group = IndicatorName)) +
+  geom_line(aes(x = year, y = indicator_data, color = IndicatorName)) +
+  facet_wrap(~ Country) +
+  theme_bw() +
+  theme(legend.position="right") + 
+   scale_x_discrete(breaks = seq(1970, 2017, 10)) +
+   scale_color_discrete("Components of GDP", breaks = c("Gross capital formation","Exports", "Government expenditure", "Household expenditure", "Imports")) + 
+  labs(title = "GDP Components over time", subtitle = "In constant 2010 USD", x = "", y = "Billion US$") +
+  theme(plot.title = element_text(face="bold")) 
+```
+Secondly, GDP is the sum of Household Expenditure (Consumption C), Gross Capital Formation (business investment I), Government Expenditure (G) and Net Exports (exports - imports). Even though there is an indicator Gross Domestic Product (GDP) in your dataframe, let's calculate it given its components discussed above.
+```{r}
+#converting to tidy wide format 
+tidy_GDP_data_2 <- tidy_GDP_data_1%>%
+  pivot_wider(
+    names_from = IndicatorName, 
+    values_from = indicator_data)
+glimpse(tidy_GDP_data_2)
+```
+
+```{r}
+# Using GDP formula to calculate GDP using GDP components - the sum of Household Expenditure (Consumption *C*), Gross Capital Formation (business investment *I*), Government Expenditure (G) and Net Exports (exports - imports)
+tidy_GDP_data_2 <- tidy_GDP_data_2 %>%
+  mutate(calculated_GDP = tidy_GDP_data_2$`Household expenditure`+ tidy_GDP_data_2$`Gross capital formation`+ tidy_GDP_data_2$`Government expenditure`+ tidy_GDP_data_2$`Exports`- tidy_GDP_data_2$`Imports`)
+#Calculating % difference between calculated GDP and UN_GDP_data GDP Figures
+tidy_GDP_data_2 <- tidy_GDP_data_2 %>%
+  mutate(percentage_difference_calculatedGDP_columnGDP = (((calculated_GDP / tidy_GDP_data_2$`Gross Domestic Product (GDP)`)-1) * 100))
+
+tidy_GDP_data_2
+```
+
+```{r}
+# Plotting a graph, utilizing Percentage Difference of Calculated GDP and UN_GDP_data GDP Figures to compare this difference across Germany, India, and United States
+tidy_GDP_data_2 %>%
+  filter(Country %in% country_list) %>%
+  ggplot(aes(x=year, y=percentage_difference_calculatedGDP_columnGDP)) +
+  geom_line(group = 1, color = "black", size = 0.8) + geom_line(group = 1,color = "black",y=0, size = 0.8) +
+  facet_wrap(~ Country) +
+  theme_bw() +
+  scale_x_discrete(breaks = seq(1970, 2017, 10)) +
+  geom_ribbon(aes(ymin = 0, ymax = pmin(0, percentage_difference_calculatedGDP_columnGDP), group=1), alpha=0.8, fill = "blue") +
+  geom_ribbon(aes(ymin = percentage_difference_calculatedGDP_columnGDP, ymax = pmin(0, percentage_difference_calculatedGDP_columnGDP), group=1), alpha=0.8, fill = "yellow") +
+  labs(title = "Percentage Difference of Calculated GDP and UN_GDP_data GDP Figures",
+       subtitle = "Yellow: Calculated GDP > UN_GDP_data GDP 
+Blue: Calculated GDP < UN_GDP_data GDP",
+         x = "Time period (1970-2017)", 
+         y = "Percentage Difference", 
+        )+
+  NULL
+
+```
+What is the % difference between calculated GDP and the GDP figure included in the dataframe?
+In the case of India, the period 1970-1990, the graph depicts a yellow region wherein calculated GDP is higher than the UN_GDP_data GDP figures. However, post 1990 (excluding 2007 and 2010), the graph depicts a blue region wherein calculated GDP is lower than the UN_GDP_data GDP figures. In 2007, the % difference between calculated GDP and the GDP figure is 2.1309% and in 2010, the % difference between calculated GDP and the GDP figure is 1.0660%
+
+In the case of Germany, the graph depicts a yellow region throughout from 1970 to 2017 wherein calculated GDP is higher than the UN_GDP_data GDP figures.The % difference between calculated GDP and the GDP figure was maximum in 1972 at 3.56%. In the United States, the graph depicts a mostly yellow region i.e.calculated GDP is higher than the UN_GDP_data GDP figures, excluding the time period from 2005-2008, 2010, and 2016-2017 which depicted a blue region i.e. calculated GDP is lower than the UN_GDP_data GDP figures.

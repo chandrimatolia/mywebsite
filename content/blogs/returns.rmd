@@ -1,0 +1,172 @@
+---
+categories:
+- ""
+- ""
+date: "2017-10-31T22:26:13-05:00"
+description: Stock Returns
+draft: false
+image: returns.jpg
+keywords: ""
+slug: returns
+title: Returns on Financial Stocks
+---
+
+```{r, setup, echo=FALSE}
+knitr::opts_chunk$set(
+  message = FALSE, 
+  warning = FALSE, 
+  tidy=FALSE,     # display code as typed
+  size="small")   # slightly smaller font for code
+options(digits = 3)
+# default figure size
+knitr::opts_chunk$set(
+  fig.width=6.75, 
+  fig.height=6.75,
+  fig.align = "center"
+)
+```
+
+```{r load-libraries, warning=FALSE, message=FALSE, echo=FALSE}
+library(tidyverse)  # Load ggplot2, dplyr, and all the other tidyverse packages
+library(mosaic)
+library(ggthemes)
+library(lubridate)
+library(fivethirtyeight)
+library(here)
+library(skimr)
+library(janitor)
+library(vroom)
+library(tidyquant)
+library(rvest) # to scrape wikipedia page
+library(kableExtra)
+library("ggpubr")
+library("scales")
+library(zoo)
+```
+
+```{r load_nyse_data, message=FALSE, warning=FALSE}
+nyse <- read_csv(here::here("data","nyse.csv"))
+```
+
+Based on the NYSE dataset, a table and a bar plot has been created to show the number of companies per sector, in descending order:
+
+```{r, c_companies_per_sector}
+ 
+companies_per_sector <- nyse %>%
+  group_by(sector) %>%
+  count(sort=TRUE)
+colnames(companies_per_sector) <- c("Sector", "Number of Companies")
+  
+companies_per_sector %>% 
+  kable()
+```
+
+
+```{r,companies_per_sector}
+colnames(companies_per_sector) <- c("sector", "number_of_companies")
+
+companies_per_sector %>% 
+  ggplot(aes(reorder(sector,-number_of_companies), number_of_companies)) +
+  geom_bar(stat="identity",fill = "coral")+
+  labs(title = "Number of companies in each sector", x = "Sector", y = "Number of Companies")+
+  coord_flip() +
+  geom_text(aes(label=number_of_companies),  vjust = 1) +
+  NULL
+```
+
+
+Next, let's choose some stocks and their ticker symbols and download some data. The 6 different stocks chosen are Apple (AAPL), Walt Disney (DIS), Domino's Pizza (DPZ), Abercrombie & Fitch Co. (ANF), Tesla (TSLA), 
+Exxon Mobil Corporation (XOM), and the S&P500 Exchange Traded Fund (SPY):
+
+
+```{r get_price_data, message=FALSE, warning=FALSE, cache=TRUE}
+# Notice the cache=TRUE argument inthe chunk options. Because getting data is time consuming, 
+# cache=TRUE means that once it downloads data, the chunk will not run again next time you knit your Rmd
+myStocks <- c("AAPL","DIS","DPZ","ANF","TSLA","XOM","SPY" ) %>%
+  tq_get(get  = "stock.prices",
+         from = "2011-01-01",
+         to   = "2021-08-31") %>%
+  group_by(symbol) 
+glimpse(myStocks) # examine the structure of the resulting data frame
+```
+
+Financial performance analysis depend on returns; If I buy a stock today for 100 and I sell it tomorrow for 101.75, my one-day return, assuming no transaction costs, is 1.75%. So given the adjusted closing prices, our first step is to calculate daily and monthly returns.
+
+
+```{r calculate_returns, message=FALSE, warning=FALSE, cache=TRUE}
+#calculate daily returns
+myStocks_returns_daily <- myStocks %>%
+  tq_transmute(select     = adjusted, 
+               mutate_fun = periodReturn, 
+               period     = "daily", 
+               type       = "log",
+               col_rename = "daily_returns",
+               cols = c(nested.col))  
+#calculate monthly returns
+myStocks_returns_monthly <- myStocks %>%
+  tq_transmute(select     = adjusted, 
+               mutate_fun = periodReturn, 
+               period     = "monthly", 
+               type       = "arithmetic",
+               col_rename = "monthly_returns",
+               cols = c(nested.col)) 
+#calculate yearly returns
+myStocks_returns_annual <- myStocks %>%
+  group_by(symbol) %>%
+  tq_transmute(select     = adjusted, 
+               mutate_fun = periodReturn, 
+               period     = "yearly", 
+               type       = "arithmetic",
+               col_rename = "yearly_returns",
+               cols = c(nested.col))
+```
+
+A table where you summarise monthly returns for each of the stocks and `SPY`; min, max, median, mean, SD, has been created:
+
+```{r summarise_monthly_returns}
+ 
+summarise_monthly_returns <- myStocks_returns_monthly %>%
+  group_by(symbol) %>% 
+  summarise(min_monthly_return = min(monthly_returns), 
+            max_monthly_return = max(monthly_returns),
+            median_monthly_return = median(monthly_returns), 
+            mean_monthly_return = mean(monthly_returns), 
+            sd_monthly_return = sd(monthly_returns)) 
+colnames(summarise_monthly_returns) <- c("Stock","Minimum Monthly Return [$]", "Maximum Monthly Return [$]", "Median of Monthly Return [$]", "Mean of Monthly Return [$]", "Standard Deviation of Monthly Return [$]")
+ 
+summarise_monthly_returns %>% 
+  kable()
+```
+
+
+A density plot, using `geom_density()`, for each of the stocks has been plotted:
+```{r density_monthly_returns}
+ 
+myStocks_returns_monthly %>%
+  ggplot(aes(x=monthly_returns)) + 
+  geom_density() +
+  facet_wrap(vars(symbol))+
+  labs(title = "Monthly return of each of the stocks", x = "Monthly return [$]", y = "Count")+
+  NULL
+```
+
+The risk of the stock can be determined by visually analyzing the proportion of the graph area that lies in the negative direction of the x-axis. This determines how the stocks were performing and whether they were likely to produce negative returns. Based on this, the riskiest stock would be XOM, because its past performance has shown that it often gives negative returns. The least risky stock would be DPZ, because its past performance indicates that it is likely to produce positive returns.
+
+Finally, a plot that shows the expected monthly return (mean) of a stock on the Y axis and the risk (standard deviation) in the X-axis has been plotted.
+
+```{r risk_return_plot}
+ 
+library(ggrepel)
+myStocks_returns_monthly %>% 
+  group_by(symbol) %>% 
+  summarise(mean_monthly_return = mean(monthly_returns), 
+            sd_monthly_return = sd(monthly_returns)) %>% 
+  ggplot(aes(y=sd_monthly_return, x=mean_monthly_return, label = symbol)) + 
+  geom_point() +
+  geom_text_repel()+
+  labs(title = "Risk of each of the stocks: Standard Deviation vs. Monthly Return", x = "Monthly return [$]", y = "Standard deviation [$]")+
+  NULL
+  
+```
+Based on this graph, ANF had a broad distribution of monthly returns but not a higher expected return when compared to other stocks. Therefore it is of high risk but not of high expected return. 
+

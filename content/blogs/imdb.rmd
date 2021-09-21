@@ -1,0 +1,251 @@
+---
+categories:
+- ""
+- ""
+date: "2017-10-31T22:26:09-05:00"
+description: Movie Analysis + Difference in Ratings between directors Spielberg and Burton
+draft: false
+image: imdb.png
+keywords: ""
+slug: imdb
+title: IMDB Movies + Ratings Analysis
+---
+
+```{r, setup, echo=FALSE}
+knitr::opts_chunk$set(
+  message = FALSE, 
+  warning = FALSE, 
+  tidy=FALSE,     # display code as typed
+  size="small")   # slightly smaller font for code
+options(digits = 3)
+# default figure size
+knitr::opts_chunk$set(
+  fig.width=6.75, 
+  fig.height=6.75,
+  fig.align = "center"
+)
+```
+
+```{r load-libraries, warning=FALSE, message=FALSE, echo=FALSE}
+library(tidyverse)  # Load ggplot2, dplyr, and all the other tidyverse packages
+library(mosaic)
+library(ggthemes)
+library(GGally)
+library(readxl)
+library(here)
+library(skimr)
+library(janitor)
+library(broom)
+library(tidyquant)
+library(infer)
+library(openintro)
+library(knitr)
+library(kableExtra)
+
+```
+# IMDB Movie Analysis
+Let us look at a subset sample of movies, taken from the Kaggle IMDB 5000 movie dataset
+```{r}
+movies <- read_csv(here::here("data", "movies.csv"))
+glimpse(movies)
+```
+
+```{r}
+skim(movies)
+```
+There is no missing values as seen in the result below. Not all the entries are distinct as the n_unique values do not match, indicating that several values were repeated. Based on the number of rows 2961 and n_unique 2907, we can conclude that 54 rows are duplicated.
+
+Besides the obvious variables of title, genre, director, year, and duration, the rest of the variables are as follows:
+
+gross : The gross earnings in the US box office, not adjusted for inflation
+budget: The movie’s budget
+cast_facebook_likes: the number of facebook likes cast memebrs received
+votes: the number of people who voted for (or rated) the movie in IMDB
+reviews: the number of reviews for that movie
+rating: IMDB average rating
+
+```{r}
+unique_movies <- movies %>%
+  distinct(title,genre,director,year,.keep_all=TRUE)
+```
+
+```{r}
+new_unique_movies <- movies %>%
+  summarise("number of unique movies"=n()) 
+```
+A table with the count of movies by genre, ranked in descending order is produced:
+```{r}
+count_movie_genre <- unique_movies %>%
+  group_by(genre) %>%
+  count(sort=TRUE)
+
+colnames(count_movie_genre) <- c("Genre", "Number of Movies")
+
+count_movie_genre %>% 
+  kable()
+```
+
+A table with the average gross earning and budget (gross and budget) by genre is produced. 
+Let us calculate a variable return_on_budget which shows how many $ did a movie make at the box office for each $ of its budget. Ranked genres by this return_on_budget in descending order!
+```{r}
+return_movie_genre <- unique_movies %>%
+  group_by(genre) %>% 
+  summarise(mean_gross = mean(gross),mean_budget = mean(budget)) %>% 
+  mutate(return_on_budget = 
+           ((mean_gross - mean_budget)/mean_budget)) %>% 
+  arrange(-return_on_budget)
+
+colnames(return_movie_genre) <- c("Genre", "Mean gross [$]", "Mean budget [$]", "Return on budget")
+  
+return_movie_genre %>% 
+  kable()
+```
+
+A table that shows the top 15 directors who have created the highest gross revenue in the box office is produced.
+```{r}
+ top_15_directors <- unique_movies %>%
+  select(director, gross) %>% 
+  group_by(director) %>% 
+  summarise(total_gross = sum(gross), 
+            mean_gross = mean(gross), 
+            median_gross = median(gross), 
+            sd_gross = sd(gross)) %>% 
+  top_n(15,total_gross) %>% 
+  arrange(-total_gross)
+
+colnames(top_15_directors) <- c("Director", "Total gross [$]", "Mean gross [$]", "Median gross [$]", "Standard deviation of gross [$]")
+  
+top_15_directors %>% 
+  kable()
+```
+
+Finally, ratings. Let's produce a table that describes how ratings are distributed by genre. We don’t want just the mean, but also, min, max, median, SD and some kind of a histogram or density graph that visually shows how ratings are distributed.
+
+```{r}
+dist_by_genre <- unique_movies %>%
+  select(genre, rating) %>% 
+  group_by(genre) %>% 
+  summarise(mean_rating = mean(rating), 
+            min_rating = min(rating), 
+            max_rating = max(rating), 
+            sd_rating = sd(rating)) 
+
+colnames(dist_by_genre) <- c("Genre", "Mean rating", "Min rating", "Max rating", "Standard deviation of rating")
+
+
+dist_by_genre %>% 
+  kable()
+```
+```{r}
+unique_movies %>%
+  ggplot(aes(x=rating)) + 
+  geom_histogram() +
+  facet_wrap(vars(genre)) +
+  labs(title = "Rating statistics of each genre", x = "Rating", y = "Count")
+```
+
+Let us examine the relationship between gross and cast_facebook_likes. A scatterplot has been produced discussing whether the number of facebook likes that the cast has received is likely to be a good predictor of how much money a movie will make at the box office. 
+
+```{r}
+unique_movies %>%
+  ggplot(aes(y=gross, x=cast_facebook_likes)) + 
+  geom_point() +
+  labs(title = "Gross vs. Cast facebook likes", x = "Cast Facebook Likes", y = "Gross [$]")+
+  NULL
+```
+It's unlikely that number of facebook likes the cast received will be a good predictor of how much money a movie will make. X-axis is the independent variable "cast_facebook_likes", Y-axis is the dependent variable "gross". There is no obvious correlation between the two variables.
+
+Let us examine the relationship between gross and budget. A scatterplot has been produced to discuss whether budget is likely to be a good predictor of how much money a movie will make at the box office.
+```{r}
+unique_movies %>%
+  ggplot(aes(y=gross, x=budget)) + 
+  geom_point() +
+  labs(title = "Gross vs. Budget", x = "Budget [$]", y = "Gross [$]")+
+  NULL
+```
+It can be inferred from the plot that budget is a weak predictor of how much money a movie will make. There is a lot of variation and scatter in the data thus the correlation is very weak.
+
+Let us examine the relationship between gross and rating. A scatterplot has been produced, faceted by genre and let'd discuss whether IMDB ratings are likely to be a good predictor of how much money a movie will make at the box office. 
+```{r}
+unique_movies %>%
+  ggplot(aes(y=gross, x=rating)) + 
+  geom_point() +
+  facet_wrap(vars(genre))+
+  labs(title = "Gross vs. the rating of the movie genre", x = "Rating", y = "Gross [$]")+
+  NULL
+```
+In the genre where there are enough data instances, the rating can be a good predictor for how much money a movie will make at the box office. This is expected because movies that are more popular are more likely to make more money. In the Action and Adventure genres, where there are lots of data points, the trend seems to be exponential. In the genres with few data points, it's hard to determine what the relationship is between the two variables.
+
+## IMDB ratings: Differences between directors
+Let us run a hypothesis test, using both the t.test command and the infer package to simulate from a null distribution, where we assume zero difference between the two.
+H0:μA−μB=0
+H1:μA−μB≠0
+t-stat is equal to 3 and p-value is equal to 0.01. Therefore, we can reject the null hypothesis. Therefore, we can conclude that we are 95% confident that movies of Stephen Spielberg have higher average ratings than those of Tim Burton.
+Let us load the data and examine its structure!
+
+```{r}
+movies <- read_csv(here::here("data", "movies.csv"))
+glimpse(movies)
+```
+
+```{r}
+#calculate the week4 and week5 confidence intervals
+rating_comparison <- movies %>% 
+  filter(director=="Steven Spielberg" | director=="Tim Burton") %>% 
+  group_by(director) %>% 
+  summarise(avg_rating = mean(rating),
+            sd_rating = sd(rating, na.rm=TRUE),
+            count_rating = n(),
+            se_rating = sd_rating / sqrt(count_rating),
+            ci_rating_up = avg_rating + qt(.975, count_rating-1)*se_rating,
+            ci_rating_dw = avg_rating - qt(.975, count_rating-1)*se_rating
+            )
+
+#plot the confidence intervals
+rating_comparison %>% 
+  ggplot(aes(x=avg_rating, y=director, color=director))+
+    geom_rect(fill="grey",alpha=0.5, color = "grey",
+            aes(xmin=max(ci_rating_dw),
+                xmax=min(ci_rating_up),
+                ymin=-Inf,
+                ymax=Inf))+
+  geom_errorbarh(aes(xmin=ci_rating_dw,xmax=ci_rating_up))+
+  geom_point(aes(x=avg_rating, y=director), size=3)+
+  geom_text(aes(label=round(avg_rating, digits=2)), vjust = -1.5)+
+  labs(title="Do Spielberg and Burton have the same mean IMDB ratings?",
+       subtitle = "95% confidence intervals overlap",
+       x = "Mean IMDB Rating")
+```
+
+```{r}
+#calculate via t-test
+comparison_rating <- movies %>% 
+  filter(director=="Steven Spielberg" | director=="Tim Burton")
+
+t.test(rating ~ director, data = comparison_rating)
+```
+
+```{r}
+#calculate using infer package
+set.seed(1234)
+ratings_in_null <- comparison_rating %>% 
+  
+  specify(rating ~ director) %>% 
+  
+  hypothesise(null="independence") %>% 
+  
+  generate(reps = 100, type = "permute") %>%
+  
+  calculate(stat = "diff in means", order = c("Tim Burton",
+                                              "Steven Spielberg"))
+
+#calculate the observed difference
+observed_difference <- comparison_rating %>%
+  specify(rating ~ director) %>%
+  calculate(stat = "diff in means")
+
+#calculate the p-value of the differences
+ratings_in_null %>% 
+  get_pvalue(obs_stat=observed_difference, direction="both")
+```
+

@@ -1,0 +1,147 @@
+---
+title: "Brexit Vote Analysis"
+date: '2017-10-31T22:26:09-05:00'
+description: Brexit Analysis
+draft: no
+image: brexit.png
+keywords: ''
+slug: brexit
+categories:
+- ''
+- ''
+---
+
+```{r, setup, echo=FALSE}
+knitr::opts_chunk$set(
+  message = FALSE, 
+  warning = FALSE, 
+  tidy=FALSE,     # display code as typed
+  size="small")   # slightly smaller font for code
+options(digits = 3)
+# default figure size
+knitr::opts_chunk$set(
+  fig.width=6.75, 
+  fig.height=6.75,
+  fig.align = "center"
+)
+```
+
+```{r load-libraries, warning=FALSE, message=FALSE, echo=FALSE}
+library(tidyverse)  # Load ggplot2, dplyr, and all the other tidyverse packages
+library(mosaic)
+library(ggthemes)
+library(lubridate)
+library(fivethirtyeight)
+library(here)
+library(skimr)
+library(janitor)
+library(vroom)
+library(tidyquant)
+library(rvest) # to scrape wikipedia page
+library(kableExtra)
+library("ggpubr")
+library("scales")
+```
+
+Let's have a look at the results of the 2016 Brexit vote in the UK. First we read the data using `read_csv()` and have a quick glimpse at the data
+
+```{r load_brexit_data, warning=FALSE, message=FALSE}
+brexit_results <- read_csv(here::here("data","brexit_results.csv"))
+
+
+glimpse(brexit_results)
+```
+The data comes from Elliott Morris, who cleaned it and made it available through his DataCamp class on analysing election and polling data in R.
+
+Our main outcome variable (or y) is leave_share, which is the percent of votes cast in favour of Brexit, or leaving the EU. Each row is a UK parliament constituency.
+
+To get a sense of the spread, or distribution, of the data, we can plot a histogram, a density plot, and the empirical cumulative distribution function of the leave % in all constituencies.
+```{r brexit_histogram, warning=FALSE, message=FALSE}
+
+# histogram
+ggplot(brexit_results, aes(x = leave_share)) +
+  geom_histogram(binwidth = 2.5, fill = "steelblue") +
+  labs(title="Histogram: Leave Share % in all constituencies",
+    x= "Leave Share %",
+    y= "Count"
+  )
+  
+
+# density plot-- think smoothed histogram
+ggplot(brexit_results, aes(x = leave_share)) +
+  geom_density() +
+  labs(title="Density Plot: Leave Share % in all constituencies",
+    x= "Leave Share %",
+    y= "Count"
+  )
+  
+
+
+# The empirical cumulative distribution function (ECDF) 
+ggplot(brexit_results, aes(x = leave_share)) +
+  stat_ecdf(geom = "step", pad = FALSE) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(title="Empirical Cumulative Distribution Function: Leave Share % in all constituencies",
+    x= "Leave Share %",
+    y= "Count"
+  )
+  
+
+
+```
+One common explanation for the Brexit outcome was fear of immigration and opposition to the EU's more open border policy. We can check the relationship (or correlation) between the proportion of native born residents (`born_in_uk`) in a constituency and its `leave_share`. To do this, let us get the correlation between the two variables!
+
+```{r brexit_immigration_correlation}
+brexit_results %>% 
+  select(leave_share, born_in_uk) %>% 
+  cor()
+
+```
+The correlation is almost 0.5, which shows that the two variables are positively correlated.
+
+A scatterplot between these two variables with the best fit line:
+
+```{r brexit_immigration_plot}
+ggplot(brexit_results, aes(x = born_in_uk, y = leave_share)) +
+  geom_point(alpha=0.3) +
+  
+  # add a smoothing line, and use method="lm" to get the best straight-line
+  geom_smooth(method = "lm") + 
+  
+  # use a white background and frame the plot with a black box
+  theme_bw() +
+   labs(title = "Constituency's Residents in favour of Brexit vs. Native Born Residents",
+       x = "Constituency's Residents Born in the UK",
+       y = "Constituency's Residents in favour of Brexit")
+```
+Upon examining the best fit line of the 'Constituency's Residents in favour of Brexit vs. Native Born Residents' scatterplot as well as the positive correlation between the proportion of native born residents (`born_in_uk`) in a constituency and its `leave_share`, it is deduced that both variables move in tandem - more the number of native born residents, more is the proportion of residents in support of Brexit. For example, constituencies like Aldridge-Brownhills (born_in_uk: 96.12207, leave_share: 67.79635) and Amber Valley (born_in_uk: 97.30437, leave_share: 65.29912) display this trend. This is mainly owing to previously mentioned reasons like fear of immigration and opposition to the EU's more open border policy. Other reasons could be the age of voters (with older voters being more likely to vote for Brexit, and a usually higher turnout of older voters affecting the overall result) and protest votes (dissatisfaction with politics at the time). Furthermore, on detailed analysis of the histogram plot, the density plot, and the empirical cumulative distribution function (ECDF), it is deduced that only about 15% of all constituencies' leave_share count is less than 40. Thereby, further solidifying the belief that Brexit was imminent.
+
+#Import the csv file
+```{r}
+brexit <- read_csv(here::here("data", "brexit_results.csv"))
+glimpse(brexit) # examine the data frame
+```
+
+
+```{r}
+temp_brexit <- brexit %>% 
+  select(con_2015, lab_2015, ld_2015, ukip_2015, leave_share) %>% 
+  pivot_longer(cols = 1:4, names_to = "party", values_to = "party_percentage")
+
+cols <- c("con_2015" = "#0087dc", "lab_2015" = "#d50000", "ld_2015" = "#FDBB30", "ukip_2015" = "#EFE600")
+
+temp_brexit %>% 
+  ggplot(aes(x=party_percentage,y=leave_share, group=party, color=party)) +
+  geom_point(alpha = 0.5)+
+  geom_smooth(method=lm, size = 0.5)+
+  labs(title = "How political affiliation translated to Brexit Voting", x = "Party % in the UK 2015 general election", y = "Leave % in the 2016 Brexit referendum")+
+  scale_colour_manual(labels = c("Conservative", "Labour","Lib Dems","UKIP"), values = cols)+
+  theme_bw()+
+  theme(legend.position = "bottom",plot.title = element_text(face = "bold", size = 13))+
+  theme(legend.title = element_blank())+
+  NULL
+```
+
+
+
+  

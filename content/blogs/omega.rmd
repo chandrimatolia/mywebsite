@@ -1,0 +1,162 @@
+---
+categories:
+- ""
+- ""
+date: "2017-10-31T22:26:13-05:00"
+description: Gender Pay Gap Analysis at Omega PLC
+draft: false
+image: omega.jpg
+keywords: ""
+slug: omega
+title: Omega Group plc- Pay Discrimination
+---
+
+```{r, setup, echo=FALSE}
+knitr::opts_chunk$set(
+  message = FALSE, 
+  warning = FALSE, 
+  tidy=FALSE,     # display code as typed
+  size="small")   # slightly smaller font for code
+options(digits = 3)
+# default figure size
+knitr::opts_chunk$set(
+  fig.width=6.75, 
+  fig.height=6.75,
+  fig.align = "center"
+)
+```
+
+```{r load-libraries, echo=FALSE}
+library(tidyverse)  # Load ggplot2, dplyr, and all the other tidyverse packages
+library(mosaic)
+library(ggthemes)
+library(GGally)
+library(readxl)
+library(here)
+library(skimr)
+library(janitor)
+library(broom)
+library(tidyquant)
+library(infer)
+library(openintro)
+```
+## Loading the data
+```{r}
+omega <- read_csv(here::here("data", "omega.csv"))
+glimpse(omega) # examine the data frame
+```
+# Relationship: Salary vs. Gender?
+
+```{r}
+# Summary Statistics of salary by gender
+mosaic::favstats (salary ~ gender, data=omega)
+```
+```{r}
+# Dataframe with two rows (male-female) and having as columns gender, mean, SD, sample size, 
+# the t-critical value, the standard error, the margin of error, 
+# and the low/high endpoints of a 95% condifence interval
+
+salary_gender <- omega %>% 
+  group_by(gender) %>% 
+  summarise (mean = mean(salary), SD = sd(salary), sample_size = n()) %>% 
+  mutate(se = sqrt(SD^2/sample_size), t_value = qt(p=.05/2, df=sample_size-1, lower.tail=FALSE),
+         margin_of_error = t_value*se, salary_low = mean-t_value*se, salary_high = mean+t_value*se)
+
+salary_gender
+```
+The 95% confidence interval for female is from 61486 to 67599, while that for male is from 70088 to 76490. Since their confidence intervals do not have any overlap, it can be concluded that the null hypothesis can be rejected. There is a significant difference in the mean of salary for female and male.
+
+Let us run a hypothesis testing, assuming as a null hypothesis that the mean difference in salaries is zero, or that, on average, men and women make the same amount of money. Let's run our hypothesis testing using t.test() and the simulation method from the infer package.
+
+```{r}
+# hypothesis testing using t.test() 
+t.test(salary ~ gender, data = omega)
+```
+
+```{r}
+# hypothesis testing using infer package
+set.seed(1234)
+
+salary_gender_boot <- omega %>% 
+  # Specify the variable of interest "salary" and group by gender
+  specify(salary ~ gender) %>% 
+  
+  # Hypothesize a null of no (or zero) difference
+  hypothesize (null = "independence") %>% 
+  
+  # Generate a bunch of simualted samples
+  generate (reps = 1000, type = "permute") %>% 
+  
+  # Find the mean diffference of each sample
+  calculate(stat = "diff in means",
+            order = c("female", "male"))
+
+
+# Select the low and high endpoint from the formula-calculated CIs
+formula_ci <- salary_gender %>%
+  select(salary_low,salary_high)
+
+# Generate 95% percentile of the difference in the two genders' salaries from the bootstrap data
+percentile_ci <- salary_gender_boot %>% 
+  get_confidence_interval(level = 0.95, type = "percentile")
+
+percentile_ci
+```
+
+```{r}
+observed_difference <- salary_gender$mean[1]-salary_gender$mean[2]
+
+visualize(salary_gender_boot) + 
+  annotate("rect", xmin=-Inf, xmax=observed_difference, ymin=0, ymax=Inf, alpha=0.3, fill = "pink") +
+  annotate("rect", xmin=-observed_difference, xmax=Inf, ymin=0, ymax=Inf, alpha=0.3, fill  = "pink") +
+  #shade_ci(endpoints = percentile_ci,fill = "khaki")+
+  labs(title='Differences in Female and Male Mean Salary in a world where there is no difference', 
+       subtitle = "Observed difference marked in red",
+       x = "Mean (female salary - male salary)", y = "Count")+
+  geom_vline(xintercept = observed_difference, colour = "red", linetype="solid", size=1.2)+
+  theme_bw()+
+  NULL
+```
+
+```{r}
+salary_gender_boot %>% 
+  get_pvalue(obs_stat = observed_difference, direction = "both")
+```
+With bootstrap, the confidence interval for the difference in the two genders’ salary is constructed, while in the null world. As a result, this CI does not include the observed difference in real world, which means that the null hypothesis should be rejected. There is a significant difference in the two genders’ salaries.
+
+## Relationship: Experience vs Gender?
+
+```{r}
+# Summary Statistics of salary by gender
+favstats (experience ~ gender, data=omega)
+```
+
+```{r}
+t.test(experience ~ gender, data = omega)
+```
+
+Based on this evidence, the t-stat value is -5, which has a larger absolute value than 1.96, indicating that there is a significant difference in the two genders’ experience.
+
+## Relationship: Salary vs. Experience?
+
+```{r}
+salary_exp <- omega %>% 
+  ggplot(aes(x = experience, y = salary))+
+  geom_point()+
+  labs(title = "Relationship between salary and number of years of experience", x = "Year(s) of experience",y = "Salary")+
+  theme_bw()+
+  NULL
+
+salary_exp
+```
+
+Correlations between the data:
+
+```{r}
+omega %>% 
+  select(gender, experience, salary) %>% #order variables they will appear in ggpairs()
+  ggpairs(aes(colour=gender, alpha = 0.3))+
+  theme_bw()
+```
+
+Generally, the distribution of years of experience for male is more widely distributed than female in the scatter plot. There is also more female than male at 0 year of experience, and there is no female with more than 30 years of experience. Overall, there is a positive relation between experience and salary. It can be seen in the gender - experience box plot that male has a higher mean value for years of experience than female, and in the gender - salary box plot male also has a higher mean salary, which is predicted. However, the difference in mean salary is smaller than that in mean experience. This indicate that salary is less likely to be dependent on gender. Moreover, gender has even narrowed the gap between the difference in the two genders’ experience. While there is no female within the 95% CI that has a higher experience level than male in their 95% CI, the CI for salaries do overlap.

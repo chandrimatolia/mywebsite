@@ -1,0 +1,53 @@
+---
+categories:
+- ""
+- ""
+date: "2017-10-31T21:28:43-05:00"
+description: "Chandrima Biography"
+draft: false 
+image: chandrima.jpg
+keywords: ""
+slug: chandrima
+title: About Me
+---
+
+```{r, setup, echo=FALSE}
+knitr::opts_chunk$set(
+  message = FALSE, 
+  warning = FALSE, 
+  tidy=FALSE,     # display code as typed
+  size="small")   # slightly smaller font for code
+options(digits = 3)
+# default figure size
+knitr::opts_chunk$set(
+  fig.width=6.75, 
+  fig.height=6.75,
+  fig.align = "center"
+)
+```
+
+```{r load-libraries, warning=FALSE, message=FALSE, echo=FALSE}
+library(tidyverse)  # Load ggplot2, dplyr, and all the other tidyverse packages
+library(gapminder)  # gapminder dataset
+library(here)
+library(janitor)
+```
+
+# To New Beginnings!
+
+## Hello everyone! My name is Chandrima (*Chandrima* in **Sanksrit** means *Moonlight*) and welcome to my website! 
+Having spent the last 23 years of my life in ‘the city that never sleeps’, Mumbai will always hold a special place in my heart.
+![](https://cdn.britannica.com/26/84526-050-45452C37/Gateway-monument-India-entrance-Mumbai-Harbour-coast.jpg)
+
+However, I am equally ecstatic to make London my new home! Locations made familiar in Bollywood films, Victorian architecture, and a melting pot of cultures, I already feel right at home in the Home of the [Big Ben!](https://www.history.com/this-day-in-history/big-ben-goes-into-operation-in-london)
+
+I aspire to break into the Financial Technology (FinTech) scene in London and strongly believe that my experience at London Business School (LBS) will provide me with the perfect platform to hone my creative outlet!
+Before LBS, I hold a Bachelors in Electronics and Telecommunication Engineering from NMIMS University, India. My ABET-accredited undergraduate STEM programme has played a crucial role in my competent quantitative and programming skills. It has vastly assisted me in building a solid background in stochastic processes, probability, and numerical analyses. 
+
+The innate thrust to be actively involved in FinTech motivated me to secure an internship as a Derivatives Research Analyst at Aditya Birla Capital Limited (ABCL). ABCL is the holding company for the financial services businesses of the Aditya Birla Group, an Indian multinational conglomerate, in the league of Fortune 500. During my internship at ABCL, I learned how derivatives play a crucial role in optimizing portfolio performance and risk management. This exposure left me yearning for more! I worked on notable projects like Portfolio Asset Allocation and Statistical Data Analysis on clients’ risk tolerance, target returns, and investment time spans; Predictive Modelling of Stocks, Futures and Options Premium Pricing; Bank Market Segmentation; and Stock Sentiment Analysis using Natural Language Processing. 
+
+During my projects, I came across various risks associated with diverse industries and their risk mitigation pipelines using different risk models and structured finance products. Thus, I was introduced to the heart and soul of the Indian financial sector, Dalal Street. It is at this point that I recognised my true calling - to flourish at the intersection of computational and analytical methods and explain real-world phenomena via data-driven insights!
+
+I bring along a strong grasp of fundamentals in Finance and Technology, an insider experience of an emerging financial market, a penchant for teamwork and leadership, and a zest for challenges. I really look forward to embarking on this new phase of my life along with my diverse cohort and the brilliant faculty at LBS, as I condition myself to successfully transition from Dalal Street to Canary Wharf, the heart and soul of the London financial sector! 
+
+PS: Hope you enjoyed the in-line URL with an interesting fact on the Big Ben! :)
