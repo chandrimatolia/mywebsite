@@ -7,13 +7,13 @@ disqusShortname: ''
 params:
   banner:
     buttonText: LET'S GET ROLLING!
-    subtitle: |- AND WELCOME TO MY PORTFOLIO WEBSITE! 
-      
+    subtitle: |-
+      AND WELCOME TO MY PORTFOLIO WEBSITE! 
     title: Namaste, I'm Chandrima Tolia
   blog: {}
   contact:
     address:
-      - city: London, NW1 4SA
+      - city: London
         country: United Kingdom
         street: Regent's Park
         title: Address
@@ -34,12 +34,12 @@ params:
     text: Please visit [this page](/)
   favicon: favicon.ico
   footer:
-    copyright: 2021 Chandrima Tolia
+    copyright: Chandrima Tolia
     enable: yes
-   # quicklinks:
-     # - alt: HTML5 UP
-     #   text: 'Design: '
-    #    url: https://www.html5up.net
+    quicklinks:
+      - alt: HTML5 UP
+        text: 'Design: '
+        url: https://www.html5up.net
     social:
       #- icon: fa-twitter
       #  label: Twitter
@@ -59,18 +59,18 @@ params:
   image: ''
   name: Chandrima Tolia
   navigation:
-    button1:
-      - name: Get Started
-        url: blogs
-    button2:
-      - name: Log In
-        url: '#'
+    # button1:
+    # - name: Get Started
+    #    url: blogs
+    #  button2:
+    #  - name: Log In
+    #   url: '#'
     links:
       - name: Home
         url: '#'
-     # - name: Blogs
-     #   url: blogs
-     # - name: Generic Blog
+      - name: Blogs
+        url: blogs
+    #- name: Generic Blog
       #  url: blogs/ipsum
      # - name: Elements
      #   url: elements.html
@@ -85,8 +85,7 @@ params:
         title: About Me
         url: blogs/chandrima
       - image: returns.jpg
-        subtitle: Performance Analysis of Apple (AAPL), Walt Disney (DIS), Domino's Pizza (DPZ), Abercrombie & Fitch Co. (ANF), Tesla (TSLA), 
-Exxon Mobil Corporation (XOM), and the S&P500 Exchange Traded Fund (SPY) via Stock Returns
+        subtitle: Performance Analysis of AAPL, DIS, DPZ, ANF, TSLA, XOM, and the SP500 Exchange Traded Fund (SPY) via Stock Returns
         title: Returns on Financial Stocks
         url: blogs/returns
       - image: brexit.png
